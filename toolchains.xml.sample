@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copy to ~/.m2/toolchains.xml, correct the two <jdkHome> paths, then build with:
+
+      mvn -Ptoolchain verify
+
+  Why bother, when JAVA_HOME already works? Because ASG Edge+ cares about two JDKs at once:
+  Corretto 21 is the bytecode target and the runtime in every Dockerfile, and Corretto 24 is the
+  forward-compat JDK CI also builds on. With both registered here you can reproduce either CI leg
+  locally without touching JAVA_HOME:
+
+      mvn -Ptoolchain verify                 # baseline, release 21
+      mvn -Ptoolchain -Pjava24 verify        # target 24, picks the 24 toolchain
+
+  Install both with SDKMAN (identifiers change, so list first):
+      sdk list java | grep amzn
+      sdk install java <21.x.y-amzn>
+      sdk install java <24.x.y-amzn>
+  or from https://aws.amazon.com/corretto/ .
+
+  The toolchains plugin is opt-in for exactly one reason: it hard-fails when this file is missing,
+  and CI does not need it (actions/setup-java already provides the exact JDK).
+-->
+<toolchains xmlns="http://maven.apache.org/TOOLCHAINS/1.1.0">
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>21</version>
+      <vendor>amazon</vendor>
+    </provides>
+    <configuration>
+      <jdkHome>/Library/Java/JavaVirtualMachines/amazon-corretto-21.jdk/Contents/Home</jdkHome>
+    </configuration>
+  </toolchain>
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>24</version>
+      <vendor>amazon</vendor>
+    </provides>
+    <configuration>
+      <jdkHome>/Library/Java/JavaVirtualMachines/amazon-corretto-24.jdk/Contents/Home</jdkHome>
+    </configuration>
+  </toolchain>
+</toolchains>

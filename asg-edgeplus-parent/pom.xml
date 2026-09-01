@@ -1,0 +1,703 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Extends spring-boot-starter-parent rather than importing spring-boot-dependencies as a BOM.
+    That is deliberate and load-bearing: the official Boot version-override mechanism works by
+    normal Maven property inheritance, so declaring <tomcat.version> below actually overrides
+    Boot's value. With a BOM import, property overrides are silently ignored because BOM
+    properties are evaluated in the BOM's own isolated context. Every CVE pin in this file depends
+    on that.
+  -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.14</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.asg.edgeplus.platform</groupId>
+  <artifactId>asg-edgeplus-parent</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>ASG Edge+ Parent POM</name>
+  <description>
+    Single source of truth for dependency versions, CVE pins and quality gates across every ASG
+    Edge+ Java service. A service's pom sets this as its parent and declares only the dependencies
+    it actually uses — never a version.
+  </description>
+
+  <properties>
+    <!--
+      JAVA VERSION POLICY. Two numbers, deliberately separate.
+
+      java.version is the BYTECODE TARGET and stays at 21. asg-edgeplus-primitives and
+      asg-edgeplus-starter-identity are consumed by services whose Dockerfiles run a Java 21 JRE;
+      a class file compiled for 24 (major version 68) will not load there at all. Because we set
+      maven.compiler.release (not just source/target), the target is independent of the JDK that
+      runs Maven - the same sources produce byte-identical 21 bytecode on Corretto 21 and on
+      Corretto 24.
+
+      java.next.version is the JDK we additionally BUILD AND TEST ON, so that moving the runtime
+      forward is a decision rather than a discovery. CI runs the whole verify lifecycle on both
+      (see .github/workflows/ci.yml). Amazon Corretto is the distribution everywhere: it is what
+      the AWS base images ship, so the JDK that compiles is the JDK family that runs.
+
+      To move a service's target forward before the platform baseline moves:  mvn -Pjava24
+      (that profile is below; it sets release=24 for that build only).
+      To move the platform baseline: bump java.version here, cut a parent release, and only then
+      update the service Dockerfiles - never the other way round.
+    -->
+    <java.version>21</java.version>
+    <java.next.version>24</java.next.version>
+    <jdk.distribution>corretto</jdk.distribution>
+
+    <!-- Derived, so a baseline move is a one-line edit above. -->
+    <maven.compiler.release>${java.version}</maven.compiler.release>
+    <maven.compiler.source>${java.version}</maven.compiler.source>
+    <maven.compiler.target>${java.version}</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- docker.available: override with -Ddocker.available=true to enable Testcontainers tests -->
+    <docker.available>false</docker.available>
+    <skipTests>false</skipTests>
+
+    <!--
+      pitest.targetPackage: each service sets this to its own root package, e.g.
+        <pitest.targetPackage>com.asg.edgeplus.configurationservice</pitest.targetPackage>
+      The parent then mutates <that>.domain.* and <that>.application.* without needing to know
+      the service's name.
+    -->
+    <pitest.targetPackage>com.asg.edgeplus</pitest.targetPackage>
+
+    <!-- Framework — must match <parent> above; used in annotationProcessorPaths below -->
+    <spring-boot.version>3.5.14</spring-boot.version>
+    <spring-modulith.version>1.4.0</spring-modulith.version>
+    <spring-cloud.version>2024.0.0</spring-cloud.version>
+    <spring-cloud-contract.version>4.2.0</spring-cloud-contract.version>
+    <spring-cloud-aws.version>3.4.0</spring-cloud-aws.version>
+
+    <!--
+      CVE version overrides. These are the official Spring Boot override property names and work
+      here only because we extend spring-boot-starter-parent (see the comment on <parent>).
+
+      THIS BLOCK IS WHY THIS FILE EXISTS. Before it, the same pins were copy-pasted into every
+      service pom and had already drifted: ASG-Edgeplus-Api-Gateway was missing the
+      spring-security and spring-kafka pins entirely, and Documents-Service carried three of six.
+      A new CVE meant editing five poms by hand and hoping nobody missed one. Now it is one edit
+      plus a Renovate PR per consumer.
+
+      When bumping: update here, release a new parent version, let Renovate open the PRs. Do not
+      pin a version in a service pom — if you find yourself wanting to, the answer is a new parent
+      release, or a documented <properties> override in that service with a comment saying why.
+    -->
+    <tomcat.version>10.1.55</tomcat.version>
+    <netty.version>4.1.136.Final</netty.version>
+    <spring-framework.version>6.2.19</spring-framework.version>
+    <spring-security.version>6.4.10</spring-security.version>
+    <spring-data-commons.version>3.5.12</spring-data-commons.version>
+    <jackson-bom.version>2.21.4</jackson-bom.version>
+    <micrometer.version>1.15.12</micrometer.version>
+    <spring-kafka.version>3.3.16</spring-kafka.version>
+    <postgresql-jdbc.version>42.7.12</postgresql-jdbc.version>
+
+    <!-- Libraries -->
+    <aws-sdk.version>2.31.54</aws-sdk.version>
+    <aws-msk-iam-auth.version>2.2.0</aws-msk-iam-auth.version>
+    <resilience4j.version>2.2.0</resilience4j.version>
+    <logstash-logback.version>8.0</logstash-logback.version>
+    <caffeine.version>3.2.0</caffeine.version>
+    <springdoc.version>2.7.0</springdoc.version>
+    <swagger.version>2.2.25</swagger.version>
+    <mapstruct.version>1.6.3</mapstruct.version>
+    <shedlock.version>6.9.1</shedlock.version>
+
+    <!-- Test -->
+    <testcontainers.version>1.21.3</testcontainers.version>
+    <archunit.version>1.3.0</archunit.version>
+    <wiremock.version>3.10.0</wiremock.version>
+
+    <!-- Static analysis / plugins -->
+    <!--
+      Error Prone / NullAway: version properties only. NEITHER IS WIRED into
+      maven-compiler-plugin's annotationProcessorPaths in this parent, and that is on purpose for
+      now: Error Prone reaches into javac internals, so every new JDK needs a matching Error Prone
+      release plus (double-dash)add-exports flags. Before enabling it, check Error Prone's supported-JDK
+      matrix against BOTH java.version and java.next.version, and expect to add
+      -XDcompilePolicy=simple (double-dash)should-stop=ifError=FLOW. Left declared so the version lives in
+      one place when we do turn it on.
+    -->
+    <errorprone.version>2.36.0</errorprone.version>
+    <nullaway.version>0.12.2</nullaway.version>
+    <!-- 0.8.13 is the first JaCoCo that accepts a Java 24 JVM; 0.8.12 aborts on it. -->
+    <jacoco.version>0.8.13</jacoco.version>
+    <!-- 1.15.0 predates JDK 22; PIT has to RUN on the JDK under test, so it moves too. -->
+    <pitest.version>1.19.1</pitest.version>
+    <pitest-junit5.version>1.2.1</pitest-junit5.version>
+    <spotbugs-maven-plugin.version>4.8.6.2</spotbugs-maven-plugin.version>
+    <dependency-check.version>10.0.4</dependency-check.version>
+    <spotless.version>7.0.2</spotless.version>
+    <sonar-maven-plugin.version>4.0.0.4121</sonar-maven-plugin.version>
+    <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+    <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
+    <maven-toolchains-plugin.version>3.2.0</maven-toolchains-plugin.version>
+    <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
+    <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.11.1</maven-javadoc-plugin.version>
+
+    <!-- This platform's own artifacts — kept in lockstep with the parent's version -->
+    <asg-platform.version>1.0.0-SNAPSHOT</asg-platform.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- This platform's own modules, so a service declares them without a version -->
+      <dependency>
+        <groupId>com.asg.edgeplus.platform</groupId>
+        <artifactId>asg-edgeplus-primitives</artifactId>
+        <version>${asg-platform.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.asg.edgeplus.platform</groupId>
+        <artifactId>asg-edgeplus-starter-identity</artifactId>
+        <version>${asg-platform.version}</version>
+      </dependency>
+
+      <!-- BOM imports. netty-bom is imported explicitly so the pin also covers AWS SDK's copy. -->
+      <dependency>
+        <groupId>io.netty</groupId>
+        <artifactId>netty-bom</artifactId>
+        <version>${netty.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.awspring.cloud</groupId>
+        <artifactId>spring-cloud-aws-dependencies</artifactId>
+        <version>${spring-cloud-aws.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.modulith</groupId>
+        <artifactId>spring-modulith-bom</artifactId>
+        <version>${spring-modulith.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws-sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Explicit pins -->
+      <dependency>
+        <groupId>org.springframework.data</groupId>
+        <artifactId>spring-data-commons</artifactId>
+        <version>${spring-data-commons.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>${postgresql-jdbc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.resilience4j</groupId>
+        <artifactId>resilience4j-spring-boot3</artifactId>
+        <version>${resilience4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.resilience4j</groupId>
+        <artifactId>resilience4j-circuitbreaker</artifactId>
+        <version>${resilience4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.resilience4j</groupId>
+        <artifactId>resilience4j-retry</artifactId>
+        <version>${resilience4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.logstash.logback</groupId>
+        <artifactId>logstash-logback-encoder</artifactId>
+        <version>${logstash-logback.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>${springdoc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-annotations-jakarta</artifactId>
+        <version>${swagger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-models-jakarta</artifactId>
+        <version>${swagger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mapstruct</groupId>
+        <artifactId>mapstruct</artifactId>
+        <version>${mapstruct.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mapstruct</groupId>
+        <artifactId>mapstruct-processor</artifactId>
+        <version>${mapstruct.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.javacrumbs.shedlock</groupId>
+        <artifactId>shedlock-spring</artifactId>
+        <version>${shedlock.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>net.javacrumbs.shedlock</groupId>
+        <artifactId>shedlock-provider-jdbc-template</artifactId>
+        <version>${shedlock.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>software.amazon.msk</groupId>
+        <artifactId>aws-msk-iam-auth</artifactId>
+        <version>${aws-msk-iam-auth.version}</version>
+      </dependency>
+
+      <!-- Test -->
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit</artifactId>
+        <version>${archunit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>${archunit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.wiremock</groupId>
+        <artifactId>wiremock-standalone</artifactId>
+        <version>${wiremock.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <repositories>
+    <repository>
+      <id>confluent</id>
+      <url>https://packages.confluent.io/maven/</url>
+      <releases><enabled>true</enabled></releases>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <!--
+          Fail fast on the wrong JDK. Without this, building on Java 11 (still the default JDK on
+          some ASG dev machines) dies inside an unrelated plugin with an unreadable stack trace.
+          Upper bound is exclusive at 25: a JDK newer than java.next.version has not been through
+          CI, so it is a conscious bump here, not a silent surprise.
+        -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven-enforcer-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>enforce-build-environment</id>
+              <phase>validate</phase>
+              <goals><goal>enforce</goal></goals>
+              <configuration>
+                <rules>
+                  <requireJavaVersion>
+                    <version>[${java.version},${java.next.version}.0.1)</version>
+                    <message>
+                      ASG Edge+ builds on Amazon Corretto ${java.version} (baseline) or
+                      ${java.next.version} (forward-compat). Install one of those and point
+                      JAVA_HOME at it, or register both as Maven toolchains and build with
+                      -Ptoolchain (see toolchains.xml.sample).
+                    </message>
+                  </requireJavaVersion>
+                  <requireMavenVersion>
+                    <version>[3.9.0,)</version>
+                  </requireMavenVersion>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+
+        <!--
+          Opt-in only (-Ptoolchain). Lets a developer keep JAVA_HOME on whatever they like while
+          this build compiles and tests against a registered Corretto JDK. Not activated by
+          default because it hard-fails when ~/.m2/toolchains.xml is absent, and CI does not need
+          it - there, actions/setup-java already provides the exact JDK.
+        -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-toolchains-plugin</artifactId>
+          <version>${maven-toolchains-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>select-jdk-toolchain</id>
+              <goals><goal>select-jdk-toolchain</goal></goals>
+            </execution>
+          </executions>
+        </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven-compiler-plugin.version}</version>
+          <configuration>
+            <release>${java.version}</release>
+            <encoding>UTF-8</encoding>
+            <compilerArgs>
+              <arg>-parameters</arg>
+            </compilerArgs>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-configuration-processor</artifactId>
+                <version>${spring-boot.version}</version>
+              </path>
+              <path>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+              </path>
+            </annotationProcessorPaths>
+          </configuration>
+        </plugin>
+
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven-surefire-plugin.version}</version>
+          <configuration>
+            <skipTests>${skipTests}</skipTests>
+            <systemPropertyVariables>
+              <user.timezone>UTC</user.timezone>
+              <java.util.logging.config.file>/dev/null</java.util.logging.config.file>
+              <docker.available>${docker.available}</docker.available>
+            </systemPropertyVariables>
+          </configuration>
+        </plugin>
+
+        <!--
+          Coverage gate per Constitution §4.3: line >= 95%, branch >= 90%.
+          The excludes here are the GENERIC ones only — paths that are untestable or covered by
+          integration tests in every service. A service that needs to exclude one of its own
+          classes by name adds it in its own pom; do not accumulate service-specific excludes here.
+        -->
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+          <configuration>
+            <excludes>
+              <exclude>**/*Application.class</exclude>
+              <exclude>**/config/**</exclude>
+              <exclude>**/package-info.class</exclude>
+              <exclude>**/infrastructure/persistence/jpa/**</exclude>
+              <exclude>**/infrastructure/projection/**</exclude>
+              <exclude>**/api/rest/**</exclude>
+              <exclude>**/application/query/**</exclude>
+            </excludes>
+          </configuration>
+          <executions>
+            <execution>
+              <id>jacoco-prepare-agent</id>
+              <goals><goal>prepare-agent</goal></goals>
+            </execution>
+            <execution>
+              <id>jacoco-report</id>
+              <phase>test</phase>
+              <goals><goal>report</goal></goals>
+            </execution>
+            <execution>
+              <id>jacoco-check</id>
+              <phase>verify</phase>
+              <goals><goal>check</goal></goals>
+              <configuration>
+                <rules>
+                  <rule>
+                    <element>BUNDLE</element>
+                    <limits>
+                      <limit>
+                        <counter>LINE</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>0.95</minimum>
+                      </limit>
+                      <limit>
+                        <counter>BRANCH</counter>
+                        <value>COVEREDRATIO</value>
+                        <minimum>0.90</minimum>
+                      </limit>
+                    </limits>
+                  </rule>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+
+        <!-- Mutation gate per Constitution §4.3: >= 85%. Targets are derived from
+             ${pitest.targetPackage}, which each service sets to its own root package. -->
+        <plugin>
+          <groupId>org.pitest</groupId>
+          <artifactId>pitest-maven</artifactId>
+          <version>${pitest.version}</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.pitest</groupId>
+              <artifactId>pitest-junit5-plugin</artifactId>
+              <version>${pitest-junit5.version}</version>
+            </dependency>
+          </dependencies>
+          <configuration>
+            <targetClasses>
+              <param>${pitest.targetPackage}.domain.*</param>
+              <param>${pitest.targetPackage}.application.*</param>
+            </targetClasses>
+            <threads>2</threads>
+            <mutators><mutator>STRONGER</mutator></mutators>
+            <mutationThreshold>85</mutationThreshold>
+            <coverageThreshold>95</coverageThreshold>
+            <timestampedReports>false</timestampedReports>
+            <outputFormats>
+              <outputFormat>HTML</outputFormat>
+              <outputFormat>XML</outputFormat>
+            </outputFormats>
+          </configuration>
+        </plugin>
+
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>${spotless.version}</version>
+          <configuration>
+            <java>
+              <includes><include>src/**/*.java</include></includes>
+              <googleJavaFormat><version>1.24.0</version></googleJavaFormat>
+              <removeUnusedImports/>
+              <trimTrailingWhitespace/>
+              <endWithNewline/>
+              <importOrder>
+                <order>java,javax,jakarta,org.springframework,com.asg.edgeplus,</order>
+              </importOrder>
+            </java>
+          </configuration>
+        </plugin>
+
+        <plugin>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs-maven-plugin</artifactId>
+          <version>${spotbugs-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.owasp</groupId>
+          <artifactId>dependency-check-maven</artifactId>
+          <version>${dependency-check.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>${maven-source-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <goals><goal>jar-no-fork</goal></goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>${maven-javadoc-plugin.version}</version>
+          <executions>
+            <execution>
+              <id>attach-javadocs</id>
+              <goals><goal>jar</goal></goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+        </plugin>
+        <plugin>
+          <groupId>org.sonarsource.scanner.maven</groupId>
+          <artifactId>sonar-maven-plugin</artifactId>
+          <version>${sonar-maven-plugin.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <!--
+      Activated for every child. A service inherits the coverage and mutation gates without
+      opting in — which is the point: ASG-Edgeplus-Api-Gateway and Documents-Service were both
+      scaffolded with no JaCoCo, no PIT and no ArchUnit, silently below Constitution §4.3.
+    -->
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!--
+      Automatic, not opt-in: applies whenever the build RUNS on JDK 24+, whatever the bytecode
+      target. These are the flags a modern JDK needs to keep the existing test stack working:
+        * EnableDynamicAgentLoading  - JDK 21+ warns, and later JDKs will refuse, when Mockito's
+                                       inline mock maker attaches its agent to the running VM.
+                                       Without this the warning becomes an error on 24.
+        * net.bytebuddy.experimental - Byte Buddy refuses unrecognised class file versions unless
+                                       told to try; needed until every transitive Byte Buddy is
+                                       new enough to know 24 natively.
+      This is what makes the Corretto 24 leg of the CI matrix green while the target stays 21.
+    -->
+    <profile>
+      <id>jdk24-runtime</id>
+      <activation>
+        <jdk>[24,)</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <argLine>@{argLine} -XX:+EnableDynamicAgentLoading -Dnet.bytebuddy.experimental=true</argLine>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!--
+      Explicit forward target. -Pjava24 compiles and tests to Java 24 bytecode instead of 21.
+      Use it to find out what a service would have to change BEFORE committing to the move; do
+      not use it to publish an artifact that other services consume, because they still run 21.
+      Requires a JDK 24 (the enforcer rule above will say so if JAVA_HOME is older).
+    -->
+    <profile>
+      <id>java24</id>
+      <properties>
+        <java.version>${java.next.version}</java.version>
+      </properties>
+    </profile>
+
+    <!--
+      Build through Maven toolchains instead of JAVA_HOME. Copy toolchains.xml.sample to
+      ~/.m2/toolchains.xml, fill in your two Corretto paths, then: mvn -Ptoolchain verify
+    -->
+    <profile>
+      <id>toolchain</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-toolchains-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </build>
+      <properties>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+      </properties>
+    </profile>
+
+    <!--
+      CI without a Docker socket. This mirrors the existing services' behaviour exactly, so
+      adopting this parent changes nothing for them.
+
+      FLAG, not a change: skipping surefire entirely means a build without Docker runs ZERO tests,
+      including the pure unit tests that need no container at all. The services already annotate
+      container-dependent tests with @EnabledIfSystemProperty(named = "docker.available", matches =
+      "true") — 17 such annotations in user-service — so surefire does not need to be skipped for
+      them to be safe. Dropping <skipTests> here would let unit tests run in every build and would
+      surface the coverage gate honestly. Left as-is deliberately: changing it belongs in its own
+      PR against one service, not in the parent that every service inherits.
+    -->
+    <profile>
+      <id>no-docker</id>
+      <activation>
+        <property>
+          <name>docker.available</name>
+          <value>false</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration><skipTests>true</skipTests></configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <configuration><skip>true</skip></configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>with-docker</id>
+      <activation>
+        <property>
+          <name>docker.available</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <properties>
+        <skipTests>false</skipTests>
+      </properties>
+    </profile>
+  </profiles>
+</project>

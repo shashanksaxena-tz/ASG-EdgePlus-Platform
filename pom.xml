@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Aggregator only — it builds the modules and is never inherited from. Services extend
+    asg-edgeplus-parent (published separately), not this file.
+  -->
+  <groupId>com.asg.edgeplus.platform</groupId>
+  <artifactId>asg-edgeplus-platform</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>ASG Edge+ Platform</name>
+  <description>
+    Shared build configuration and cross-cutting infrastructure for ASG Edge+ services.
+    Contains no domain code — see README.md for the rule that decides what may live here.
+  </description>
+
+  <modules>
+    <module>asg-edgeplus-parent</module>
+    <module>asg-edgeplus-primitives</module>
+    <module>asg-edgeplus-starter-identity</module>
+  </modules>
+</project>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.asg.edgeplus.platform</groupId>
+    <artifactId>asg-edgeplus-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../asg-edgeplus-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>asg-edgeplus-primitives</artifactId>
+  <packaging>jar</packaging>
+
+  <name>ASG Edge+ Domain Primitives</name>
+  <description>
+    Technical value objects every service's domain layer needs: TenantId, Money, Result.
+    Pure Java — no Spring, no JPA, no Jackson. Constitution §4.4 mandates Money platform-wide and
+    ArchUnit enforces it, which is what makes these platform primitives rather than
+    bounded-context concepts (see README on java-architecture SKILL §7.7).
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- This module has no Spring context, so PIT's Spring-aware defaults are pointless here
+           and the domain/application package convention does not apply. -->
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <configuration>
+          <targetClasses>
+            <param>com.asg.edgeplus.platform.domain.primitives.*</param>
+          </targetClasses>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

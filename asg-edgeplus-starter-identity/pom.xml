@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.asg.edgeplus.platform</groupId>
+    <artifactId>asg-edgeplus-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../asg-edgeplus-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>asg-edgeplus-starter-identity</artifactId>
+  <packaging>jar</packaging>
+
+  <name>ASG Edge+ Identity Starter</name>
+  <description>
+    Reads the caller identity the API gateway puts on every request (X-User-Id, X-Tenant-Id,
+    X-Roles) and exposes it as a CallerContext. Every service needs this identically and none of it
+    is domain logic, so it lives here rather than being written five times.
+  </description>
+
+  <properties>
+    <pitest.targetPackage>com.asg.edgeplus.platform</pitest.targetPackage>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.asg.edgeplus.platform</groupId>
+      <artifactId>asg-edgeplus-primitives</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- A starter is a library, not an application: nothing to repackage. -->
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <configuration>
+          <targetClasses>
+            <param>com.asg.edgeplus.platform.identity.*</param>
+          </targetClasses>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Spring Boot majors/minors are a deliberate platform decision — never automerge, and the CVE pin block in asg-edgeplus-parent must be re-checked against the new Boot baseline.",
+      "matchPackageNames": ["org.springframework.boot:spring-boot-starter-parent"],
+      "automerge": false,
+      "addLabels": ["platform-decision"]
+    },
+    {
+      "description": "Build/test plugins are safe to batch.",
+      "matchManagers": ["maven"],
+      "matchPackagePatterns": ["^org\\.jacoco", "^org\\.pitest", "^com\\.diffplug", "^com\\.tngtech\\.archunit"],
+      "groupName": "build tooling"
+    }
+  ],
+  "vulnerabilityAlerts": { "labels": ["security"], "automerge": false }
+}
