@@ -1,5 +1,5 @@
 target/
-!.mvn/wrapper/maven-wrapper.jar
+# only-script wrapper: there is no maven-wrapper.jar to un-ignore.
 .idea/
 *.iml
 .vscode/

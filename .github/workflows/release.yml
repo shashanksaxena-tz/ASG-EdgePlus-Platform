@@ -24,9 +24,9 @@ jobs:
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
       - name: Set version from tag
-        run: mvn -B -ntp versions:set -DnewVersion=${GITHUB_REF_NAME#v} -DgenerateBackupPoms=false
+        run: ./mvnw -B -ntp versions:set -DnewVersion=${GITHUB_REF_NAME#v} -DgenerateBackupPoms=false
       - name: Publish
-        run: mvn -B -ntp deploy -Ddocker.available=false
+        run: ./mvnw -B -ntp deploy -Ddocker.available=false
         env:
           MAVEN_USERNAME: ${{ github.actor }}
           MAVEN_PASSWORD: ${{ secrets.GITHUB_TOKEN }}

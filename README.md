@@ -105,11 +105,18 @@ all.
 ### Locally
 
 ```bash
-mvn verify                       # uses JAVA_HOME; enforcer rejects anything outside [21, 24]
-mvn -Pjava24 verify              # compile and test to Java 24 bytecode (needs a JDK 24)
-mvn -Ptoolchain verify           # use registered Corretto toolchains instead of JAVA_HOME
-mvn -Ptoolchain -Pjava24 verify  # ...targeting 24
+./mvnw verify                       # uses JAVA_HOME; enforcer rejects anything outside [21, 24]
+./mvnw -Pjava24 verify              # compile and test to Java 24 bytecode (needs a JDK 24)
+./mvnw -Ptoolchain verify           # use registered Corretto toolchains instead of JAVA_HOME
+./mvnw -Ptoolchain -Pjava24 verify  # ...targeting 24
 ```
+
+Always `./mvnw`, never a system `mvn`. The wrapper (`only-script`, no jar in the repo) pins Maven
+**3.9.16** in `.mvn/wrapper/maven-wrapper.properties`, so a laptop, a CI runner and a Docker build
+all run the same Maven — which is the one thing that makes "works on my machine" reproducible. CI
+calls `./mvnw` too, on purpose: a CI that used its own `mvn` would defeat the pin. The wrapper needs
+no local Maven install, only a JDK. (The estate is split today: Api-Gateway is on 3.9.16,
+User-Service, Documents-Service and Audit-Service still on 3.9.14 — worth aligning in their own PR.)
 
 Copy `toolchains.xml.sample` to `~/.m2/toolchains.xml` and fix the two `jdkHome` paths to use
 `-Ptoolchain`. Install both JDKs with `sdk list java | grep amzn` then `sdk install java <ver>-amzn`,
