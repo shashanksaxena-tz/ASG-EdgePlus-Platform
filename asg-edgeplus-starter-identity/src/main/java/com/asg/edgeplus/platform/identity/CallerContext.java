@@ -1,6 +1,8 @@
 package com.asg.edgeplus.platform.identity;
 
 import com.asg.edgeplus.platform.domain.primitives.TenantId;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -25,7 +27,10 @@ public record CallerContext(UUID userId, TenantId tenantId, Set<String> roles) {
   public CallerContext {
     Objects.requireNonNull(userId, "CallerContext.userId");
     Objects.requireNonNull(roles, "CallerContext.roles");
-    roles = Set.copyOf(roles);
+    // Set.copyOf does not preserve iteration order (it's deliberately randomized per JVM run) --
+    // GatewayIdentityHeaders.parseRoles() uses a LinkedHashSet specifically for readable logs, so
+    // that order must survive here too.
+    roles = Collections.unmodifiableSet(new LinkedHashSet<>(roles));
   }
 
   /** {@code true} when the caller is acting inside a specific tenant. */

@@ -137,7 +137,11 @@
     <jacoco.version>0.8.13</jacoco.version>
     <!-- 1.15.0 predates JDK 22; PIT has to RUN on the JDK under test, so it moves too. -->
     <pitest.version>1.19.1</pitest.version>
-    <pitest-junit5.version>1.2.1</pitest-junit5.version>
+    <!-- 1.2.1 bundled junit-platform-launcher at compile scope, which collided with PIT's own
+         auto-resolved matching version and broke coverage generation under JUnit Platform 1.12
+         ("OutputDirectoryProvider not available"). 1.2.2 marks it provided; PIT then correctly
+         resolves the launcher version that matches the project's junit-platform-engine. -->
+    <pitest-junit5.version>1.2.2</pitest-junit5.version>
     <spotbugs-maven-plugin.version>4.8.6.2</spotbugs-maven-plugin.version>
     <dependency-check.version>10.0.4</dependency-check.version>
     <spotless.version>7.0.2</spotless.version>
