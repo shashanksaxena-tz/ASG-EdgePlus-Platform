@@ -170,6 +170,11 @@
         <artifactId>asg-edgeplus-starter-identity</artifactId>
         <version>${asg-platform.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.asg.edgeplus.platform</groupId>
+        <artifactId>asg-edgeplus-starter-tenancy</artifactId>
+        <version>${asg-platform.version}</version>
+      </dependency>
 
       <!-- BOM imports. netty-bom is imported explicitly so the pin also covers AWS SDK's copy. -->
       <dependency>

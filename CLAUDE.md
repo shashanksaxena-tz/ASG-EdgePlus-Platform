@@ -24,6 +24,7 @@ on purpose, and the drift is the seam), anything with a service's business rules
 | `asg-edgeplus-parent` | Parent POM: CVE pins, quality gates, JDK policy, plugin management | Build config, not runtime |
 | `asg-edgeplus-primitives` | `TenantId`, `Money`, `Result` | Value objects with no business rules; changing one is a semantic change nobody wants independently |
 | `asg-edgeplus-starter-identity` | Auto-configured `CallerContext` from the gateway's identity headers | One correct answer to one question, and the gateway already decided it |
+| `asg-edgeplus-starter-tenancy` | Routes a request to the firm's spoke database; per-service schema, login and Liquibase history inside it (ADR-0058) | Mechanism only: the service supplies a schema name and a changelog, the starter knows no table. See its README |
 
 `asg-edgeplus-primitives` keeps the package `com.asg.edgeplus.platform.domain.primitives` — the same
 package the classes had inside user-service — so adopting it is *delete four files, add one

@@ -50,6 +50,7 @@ those gates the default rather than something each service remembers to add.
 | `asg-edgeplus-parent` | The POM every service sets as its `<parent>`. Versions, CVE pins, quality gates, plugin configuration. No code. |
 | `asg-edgeplus-primitives` | `TenantId`, `Money`, `Result`. Pure Java, no Spring. Lifted verbatim from user-service, same package, so adopting it is a delete-plus-dependency with zero import changes. |
 | `asg-edgeplus-starter-identity` | Reads the gateway's `X-User-Id` / `X-Tenant-Id` / `X-Roles` into a `CallerContext`. Auto-configured. |
+| `asg-edgeplus-starter-tenancy` | Routes each request to the calling firm's spoke database and migrates the service's own schema there on first use. Auto-configured; see the module README. |
 
 ## Using it
 
