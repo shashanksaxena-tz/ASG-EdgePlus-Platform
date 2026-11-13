@@ -204,4 +204,55 @@ class TenancyPropertiesTest {
     assertThat(text).doesNotContain("admin-secret-1").doesNotContain(TestProperties.valid().password());
     assertThat(text).contains("password=****").contains("adminUsername=provisioner");
   }
+
+  // ---------------------------------------------------------------- two logins (AE-Q-006 B)
+
+  @Test
+  void singleLoginModeIsTheDefaultAndTheServiceLoginOwnsTheSchema() {
+    TenancyProperties p = TestProperties.valid();
+    assertThat(p.hasMigrationLogin()).isFalse();
+    assertThat(p.schemaOwnerUsername()).isEqualTo(p.username());
+  }
+
+  @Test
+  void aMigrationLoginOwnsTheSchemaWhenConfigured() {
+    TenancyProperties p = TestProperties.withMigration("svc_lease_mig", "mig-test-only");
+    assertThat(p.hasMigrationLogin()).isTrue();
+    assertThat(p.schemaOwnerUsername()).isEqualTo("svc_lease_mig");
+    assertThatCode(p::validate).doesNotThrowAnyException();
+  }
+
+  @Test
+  void migrationCredentialsMustBeSetTogether() {
+    assertThatIllegalStateException()
+        .isThrownBy(() -> TestProperties.withMigration("svc_lease_mig", null).validate())
+        .withMessageContaining("asg.platform.tenancy.migration-username and migration-password");
+  }
+
+  @Test
+  void theMigrationLoginMustDifferFromTheRuntimeLogin() {
+    assertThatIllegalStateException()
+        .isThrownBy(() -> TestProperties.withMigration("svc_lease", "x").validate())
+        .withMessageContaining("migration-username must differ from username");
+  }
+
+  @Test
+  void loginNamesMustBeLowerCaseIdentifiersBecauseTheyReachChangesetsUnquoted() {
+    assertThatIllegalStateException()
+        .isThrownBy(() -> TestProperties.withCredentials("svc\"; DROP", "pw").validate())
+        .withMessageContaining("username");
+    assertThatIllegalStateException()
+        .isThrownBy(() -> TestProperties.withMigration("Svc_Mig", "pw").validate())
+        .withMessageContaining("migration-username");
+    assertThatIllegalStateException()
+        .isThrownBy(() -> TestProperties.withAdmin("bad admin", "pw").validate())
+        .withMessageContaining("admin-username");
+  }
+
+  @Test
+  void toStringMasksTheMigrationPasswordToo() {
+    String text = TestProperties.withMigration("svc_lease_mig", "mig-secret-9").toString();
+
+    assertThat(text).doesNotContain("mig-secret-9").contains("migrationUsername=svc_lease_mig");
+  }
 }

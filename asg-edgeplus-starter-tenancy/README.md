@@ -35,6 +35,7 @@ gateway ──X-Tenant-Id──▶ GatewayIdentityFilter ──▶ TenantScopeFi
 | `username` / `password` | yes | this service's login. No defaults |
 | `changelog` | yes | classpath path of the service's master changelog |
 | `admin-username` / `admin-password` | no | provisioner login used only to `CREATE SCHEMA ... AUTHORIZATION <username>`. Without it the service login creates its own schema and needs `CREATE` on the database |
+| `migration-username` / `migration-password` | no (both or neither) | a second login that **owns** the schema and runs Liquibase. Request pools still connect as `username`, which then holds only what the service's changesets grant it (the changelog receives it as `${runtimeLogin}`) plus `USAGE` on the schema. Must differ from `username`. Use it when a grant has to be a real limit, e.g. an INSERT-only table: the owner of a table can always drop its triggers |
 | `pool-max-size` | no (3) | connections per firm |
 | `pool-idle-timeout` | no (`PT5M`) | |
 | `platform-scope-roles` | no (empty) | roles allowed to request platform scope |
@@ -54,6 +55,25 @@ JPA, `spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access=false` plu
   changeset is applied once (Postgres advisory lock for schema creation, Liquibase lock for
   changesets). Different firms migrate one at a time per JVM, because Liquibase's scope stack is
   process-wide.
+
+## Two logins (covered by `TwoLoginTenancyPostgresTest`)
+
+With `migration-username` set, the schema, its tables and its changelog history are owned by the
+migration login; requests run as `username` with only the granted privileges, so `ALTER`, `DROP`,
+`CREATE` and any ungranted DML fail with SQLSTATE `42501`. A changeset grants table privileges like:
+
+```yaml
+- sql:
+    sql: GRANT SELECT, INSERT ON ledger_row TO "${runtimeLogin}"
+```
+
+Before every migration the starter **verifies** the barrier and refuses the firm (503 to the
+caller) unless the migration login owns the schema and the runtime login is neither a superuser nor
+a member of the owner role. Login names must match `^[a-z][a-z0-9_]{0,62}$`.
+
+**The runtime login name is fixed per environment.** Liquibase computes a changeset's checksum after
+substituting `${runtimeLogin}`, so renaming the login (e.g. alternating-user secret rotation) would
+fail checksum validation on every firm. Rotate the password, not the name.
 
 ## Not here
 
