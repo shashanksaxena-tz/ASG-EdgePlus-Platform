@@ -23,5 +23,6 @@
     <module>asg-edgeplus-parent</module>
     <module>asg-edgeplus-primitives</module>
     <module>asg-edgeplus-starter-identity</module>
+    <module>asg-edgeplus-starter-tenancy</module>
   </modules>
 </project>

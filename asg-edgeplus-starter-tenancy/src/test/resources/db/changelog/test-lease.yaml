@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: lease-001-widget
+      author: platform-test
+      changes:
+        - createTable:
+            tableName: widget
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: label, type: text }
+  - changeSet:
+      id: lease-002-widget-note
+      author: platform-test
+      changes:
+        - addColumn:
+            tableName: widget
+            columns:
+              - column: { name: note, type: text }

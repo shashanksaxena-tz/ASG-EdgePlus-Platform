@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.asg.edgeplus.platform</groupId>
+    <artifactId>asg-edgeplus-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../asg-edgeplus-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>asg-edgeplus-starter-tenancy</artifactId>
+  <packaging>jar</packaging>
+
+  <name>ASG Edge+ Tenancy Starter</name>
+  <description>
+    Routes each request to the calling firm's spoke database (database-per-tenant, KB ADR-004) and
+    gives every service its own schema, login and Liquibase history inside that database
+    (ADR-0058). Contains no domain types: a service supplies a changelog and a schema name.
+  </description>
+
+  <properties>
+    <pitest.targetPackage>com.asg.edgeplus.platform</pitest.targetPackage>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.asg.edgeplus.platform</groupId>
+      <artifactId>asg-edgeplus-primitives</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.asg.edgeplus.platform</groupId>
+      <artifactId>asg-edgeplus-starter-identity</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.liquibase</groupId>
+      <artifactId>liquibase-core</artifactId>
+    </dependency>
+    <!-- The schema/lock statements are Postgres-specific, so the driver comes with the starter. -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <configuration>
+          <targetClasses>
+            <param>com.asg.edgeplus.platform.tenancy.*</param>
+          </targetClasses>
+          <!-- The Postgres tests are gated on this property; PIT's minion JVM does not inherit
+               Surefire's systemPropertyVariables, so without it they are silently skipped and the
+               migrator's mutants all survive. -->
+          <jvmArgs>
+            <value>-Ddocker.available=${docker.available}</value>
+          </jvmArgs>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

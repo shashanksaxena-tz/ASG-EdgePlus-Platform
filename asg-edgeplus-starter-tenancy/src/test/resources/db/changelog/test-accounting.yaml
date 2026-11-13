@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: acct-001-ledger-entry
+      author: platform-test
+      changes:
+        - createTable:
+            tableName: ledger_entry
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: amount, type: "numeric(19,4)" }
