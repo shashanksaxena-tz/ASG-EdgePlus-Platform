@@ -133,4 +133,29 @@ public record TenancyProperties(
   private static boolean isBlank(String s) {
     return s == null || s.isBlank();
   }
+
+  /**
+   * Passwords masked: the generated record {@code toString()} would print every credential, and a
+   * properties object ends up in a log or an exception message sooner or later (Constitution 4.12).
+   */
+  @Override
+  public String toString() {
+    return "TenancyProperties[enabled=" + enabled
+        + ", jdbcUrlTemplate=" + jdbcUrlTemplate
+        + ", databaseNameTemplate=" + databaseNameTemplate
+        + ", schema=" + schema
+        + ", username=" + username
+        + ", password=" + mask(password)
+        + ", changelog=" + changelog
+        + ", adminUsername=" + adminUsername
+        + ", adminPassword=" + mask(adminPassword)
+        + ", poolMaxSize=" + poolMaxSize
+        + ", poolIdleTimeout=" + poolIdleTimeout
+        + ", platformScopeRoles=" + platformScopeRoles
+        + "]";
+  }
+
+  private static String mask(String secret) {
+    return secret == null ? "null" : "****";
+  }
 }

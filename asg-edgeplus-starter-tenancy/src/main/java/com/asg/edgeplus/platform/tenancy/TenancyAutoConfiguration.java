@@ -44,7 +44,7 @@ public class TenancyAutoConfiguration {
   }
 
   @Bean
-  @ConditionalOnMissingBean
+  @ConditionalOnMissingBean(SpokeProvisioner.class)
   public SpokeSchemaMigrator spokeSchemaMigrator(TenancyProperties properties) {
     properties.validate();
     return new SpokeSchemaMigrator(properties);
@@ -53,8 +53,8 @@ public class TenancyAutoConfiguration {
   @Bean
   @ConditionalOnMissingBean
   public SpokePools spokePools(
-      SpokeLocator locator, SpokeSchemaMigrator migrator, TenancyProperties properties) {
-    return new SpokePools(locator, migrator, properties);
+      SpokeLocator locator, SpokeProvisioner provisioner, TenancyProperties properties) {
+    return new SpokePools(locator, provisioner, properties);
   }
 
   /**
@@ -65,7 +65,11 @@ public class TenancyAutoConfiguration {
   @Primary
   public DataSource tenantRoutingDataSource(
       SpokePools pools,
+      TenancyProperties properties,
       @Qualifier("platformDataSource") ObjectProvider<DataSource> platformDataSource) {
+    // Validated here as well, because this bean is the one a service cannot replace: a service
+    // that declares its own locator and provisioner would otherwise skip validation entirely.
+    properties.validate();
     return new TenantRoutingDataSource(pools, platformDataSource.getIfAvailable());
   }
 

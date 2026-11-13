@@ -1,5 +1,8 @@
 package com.asg.edgeplus.platform.tenancy;
 
+import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
@@ -96,5 +99,37 @@ class TenantScopesTest {
   void callInRejectsNullArguments() {
     assertThatNullPointerException().isThrownBy(() -> TenantScopes.callIn(null, () -> "x"));
     assertThatNullPointerException().isThrownBy(() -> TenantScopes.callIn(FIRM_A, null));
+  }
+
+  @Test
+  void switchingToAnotherScopeWhileARoutedConnectionIsBoundIsRefused() {
+    TenantRoutingDataSource routing = mock(TenantRoutingDataSource.class);
+    TenantScopes.runIn(
+        FIRM_A,
+        () -> {
+          TransactionSynchronizationManager.bindResource(routing, new Object());
+          try {
+            assertThatThrownBy(() -> TenantScopes.runIn(FIRM_B, () -> {}))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("inside an active transaction");
+            assertThatThrownBy(() -> TenantScopes.runIn(TenantScope.platform(), () -> {}))
+                .isInstanceOf(IllegalStateException.class);
+            assertThat(TenantScopes.callIn(FIRM_A, () -> "same scope is fine")).isEqualTo("same scope is fine");
+            assertThat(TenantScopes.current()).contains(FIRM_A);
+          } finally {
+            TransactionSynchronizationManager.unbindResource(routing);
+          }
+        });
+  }
+
+  @Test
+  void aTransactionOnAnotherResourceDoesNotBlockEnteringAScope() {
+    Object kafkaProducerFactory = new Object();
+    TransactionSynchronizationManager.bindResource(kafkaProducerFactory, new Object());
+    try {
+      assertThat(TenantScopes.callIn(FIRM_B, () -> TenantScopes.current())).contains(FIRM_B);
+    } finally {
+      TransactionSynchronizationManager.unbindResource(kafkaProducerFactory);
+    }
   }
 }

@@ -1,5 +1,9 @@
 package com.asg.edgeplus.platform.tenancy;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.util.concurrent.CompletableFuture;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -450,5 +454,71 @@ class TenancyPostgresTest {
     } finally {
       exec.shutdownNow();
     }
+  }
+
+  // ------------------------------------------------- review fixes (PR #1)
+
+  @Test
+  void aTransactionInOneFirmCannotWriteToAnotherFirmBySwitchingScope() {
+    provisionDatabase(firmA);
+    provisionDatabase(firmB);
+    SpokePools p = pools(lease(SharedPostgres.ADMIN_PASSWORD));
+    TenantRoutingDataSource routing = new TenantRoutingDataSource(p, null);
+    JdbcTemplate routed = new JdbcTemplate(routing);
+    TransactionTemplate tx = new TransactionTemplate(new DataSourceTransactionManager(routing));
+
+    assertThatThrownBy(
+            () ->
+                TenantScopes.runIn(
+                    TenantScope.firm(firmA),
+                    () ->
+                        tx.executeWithoutResult(
+                            status ->
+                                TenantScopes.runIn(
+                                    TenantScope.firm(firmB),
+                                    () ->
+                                        routed.update(
+                                            "INSERT INTO widget(id, label) VALUES (?, 'meant-for-b')",
+                                            UUID.randomUUID())))))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(jdbc(p, firmA).queryForObject("SELECT count(*) FROM widget", Integer.class)).isZero();
+    assertThat(jdbc(p, firmB).queryForObject("SELECT count(*) FROM widget", Integer.class)).isZero();
+  }
+
+  @Test
+  void aChangelogLockLeftByACrashedInstanceTimesOutThatFirmAloneAndOtherFirmsStillOpen()
+      throws Exception {
+    provisionDatabase(firmA);
+    provisionDatabase(firmB);
+    TenancyProperties props = lease(SharedPostgres.ADMIN_PASSWORD);
+    jdbc(pools(props), firmA).queryForObject("SELECT count(*) FROM widget", Integer.class);
+    SharedPostgres.execute(
+        dbOf(firmA),
+        "UPDATE lease.databasechangeloglock SET locked = true, lockgranted = now(), lockedby = 'crashed-pod'");
+
+    Duration timeout = Duration.ofSeconds(6);
+    SpokePools stuck =
+        new SpokePools(
+            new TemplateSpokeLocator(props.databaseNameTemplate()),
+            new SpokeSchemaMigrator(props, timeout),
+            props);
+    opened.add(stuck);
+    long started = System.nanoTime();
+    CompletableFuture<Object> firmAFirstUse = CompletableFuture.supplyAsync(() -> stuck.forFirm(firmA));
+    Thread.sleep(300);
+
+    SpokePools other =
+        new SpokePools(
+            new TemplateSpokeLocator(props.databaseNameTemplate()),
+            new SpokeSchemaMigrator(props, timeout),
+            props);
+    opened.add(other);
+    assertThat(jdbc(other, firmB).queryForObject("SELECT count(*) FROM widget", Integer.class)).isZero();
+    assertThat(firmAFirstUse).as("firm B opened while firm A was still waiting").isNotDone();
+
+    assertThatThrownBy(firmAFirstUse::join).hasRootCauseMessage(
+        "the changelog lock of schema 'lease' has been held for longer than PT6S; a crashed migration may have left DATABASECHANGELOGLOCK set");
+    assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(30));
   }
 }

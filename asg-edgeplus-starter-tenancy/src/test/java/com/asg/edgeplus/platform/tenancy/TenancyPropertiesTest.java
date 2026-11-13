@@ -196,4 +196,12 @@ class TenancyPropertiesTest {
     org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
         .isThrownBy(() -> p.jdbcUrl("postgres"));
   }
+
+  @Test
+  void toStringNeverPrintsAPassword() {
+    String text = TestProperties.withAdmin("provisioner", "admin-secret-1").toString();
+
+    assertThat(text).doesNotContain("admin-secret-1").doesNotContain(TestProperties.valid().password());
+    assertThat(text).contains("password=****").contains("adminUsername=provisioner");
+  }
 }

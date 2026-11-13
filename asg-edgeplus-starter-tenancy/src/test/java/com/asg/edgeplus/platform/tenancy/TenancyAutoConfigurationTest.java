@@ -193,4 +193,25 @@ class TenancyAutoConfigurationTest {
       return ds;
     }
   }
+
+  @Test
+  void aServicesOwnProvisionerReplacesTheMigratorAndIsTheOneThePoolsUse() {
+    SpokeProvisioner own = database -> {};
+    runner
+        .withBean(SpokeProvisioner.class, () -> own)
+        .run(
+            ctx -> {
+              assertThat(ctx).doesNotHaveBean(SpokeSchemaMigrator.class);
+              assertThat(ctx).hasSingleBean(SpokePools.class);
+            });
+  }
+
+  @Test
+  void invalidPropertiesFailStartupEvenWhenTheServiceDeclaresItsOwnLocatorAndProvisioner() {
+    runner
+        .withPropertyValues("asg.platform.tenancy.schema=Bad-Schema")
+        .withBean(SpokeProvisioner.class, () -> database -> {})
+        .withBean(SpokeLocator.class, () -> tenant -> "asg_spoke_x")
+        .run(ctx -> assertThat(ctx).hasFailed());
+  }
 }

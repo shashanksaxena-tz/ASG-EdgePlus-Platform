@@ -3,6 +3,7 @@ package com.asg.edgeplus.platform.tenancy;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * The scope bound to the current thread.
@@ -26,11 +27,31 @@ public final class TenantScopes {
   /**
    * Runs {@code work} in {@code scope} and restores whatever was bound before. Restores rather than
    * clears so that platform work inside firm work (or the reverse) does not drop the outer scope.
+   *
+   * <p><b>Not inside a routed transaction.</b> A Spring transaction binds its connection when it
+   * starts, so every statement in it goes to the database of the scope that was current then,
+   * whatever is bound later. Switching to a different scope while a connection of the
+   * {@link TenantRoutingDataSource} is bound to this thread would therefore write one firm's data into
+   * another firm's database; it is refused with {@link IllegalStateException}. Transactions on
+   * other resources (a Kafka transaction, a service's own platform DataSource) do not count.
+   * Entering the scope that is already current is allowed. Start a new transaction inside the new
+   * scope instead (e.g. {@code Propagation.REQUIRES_NEW} called from within {@code work} is fine,
+   * because it starts after the switch).
    */
   public static <T> T callIn(TenantScope scope, Supplier<T> work) {
     Objects.requireNonNull(scope, "scope");
     Objects.requireNonNull(work, "work");
     TenantScope previous = CURRENT.get();
+    if (!scope.equals(previous) && routedConnectionIsBound()) {
+      throw new IllegalStateException(
+          "refusing to switch tenant scope from "
+              + previous
+              + " to "
+              + scope
+              + " inside an active transaction: its connection already belongs to "
+              + previous
+              + ". Switch scope before the transaction starts.");
+    }
     CURRENT.set(scope);
     try {
       return work.get();
@@ -47,6 +68,11 @@ public final class TenantScopes {
           work.run();
           return null;
         });
+  }
+
+  private static boolean routedConnectionIsBound() {
+    return TransactionSynchronizationManager.getResourceMap().keySet().stream()
+        .anyMatch(TenantRoutingDataSource.class::isInstance);
   }
 
   static void bind(TenantScope scope) {
