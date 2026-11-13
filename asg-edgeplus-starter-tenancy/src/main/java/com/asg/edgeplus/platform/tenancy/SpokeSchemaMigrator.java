@@ -31,6 +31,15 @@ import org.slf4j.LoggerFactory;
  * another service's login is refused with {@code 42501} on it. Migration then runs as the
  * <em>service</em> login, not the provisioner, so every object belongs to the service too.
  *
+ * <p><b>Two-login mode</b> (ADR-0058 amendment, {@link TenancyProperties#migrationUsername()}): the
+ * schema is owned by, and migrated as, the migration login; the runtime login gets {@code USAGE} on
+ * the schema here and table grants from the service's changesets, which receive its name as the
+ * changelog parameter {@code runtimeLogin}. In single-login mode the same parameter names the
+ * service login, so one changelog serves both modes. Before every migration the barrier is
+ * <em>verified</em>, not assumed: the migration login must own the schema, and the runtime login
+ * must be neither a superuser nor a member of the owner role. Otherwise the firm is refused, because
+ * grants that the runtime login can bypass are not the limit the service relies on.
+ *
  * <p><b>Each service has its own history.</b> Liquibase's {@code defaultSchemaName} and
  * {@code liquibaseSchemaName} are both the service schema, so {@code DATABASECHANGELOG} and its
  * lock table live there and two services never see, or lock, each other's changesets.
@@ -95,14 +104,16 @@ public class SpokeSchemaMigrator implements SpokeProvisioner {
   }
 
   private void createSchemaIfAbsent(String url) throws SQLException {
-    String user = properties.hasAdmin() ? properties.adminUsername() : properties.username();
-    String password = properties.hasAdmin() ? properties.adminPassword() : properties.password();
+    String user = properties.hasAdmin() ? properties.adminUsername() : properties.schemaOwnerUsername();
+    String password =
+        properties.hasAdmin() ? properties.adminPassword() : properties.schemaOwnerPassword();
     try (Connection c = connect(url, user, password)) {
       c.setAutoCommit(true);
       lock(c);
       try {
         if (!schemaExists(c)) {
-          String owner = properties.hasAdmin() ? " AUTHORIZATION " + quote(properties.username()) : "";
+          String owner =
+              properties.hasAdmin() ? " AUTHORIZATION " + quote(properties.schemaOwnerUsername()) : "";
           try (Statement s = c.createStatement()) {
             s.executeUpdate("CREATE SCHEMA IF NOT EXISTS " + quote(properties.schema()) + owner);
           }
@@ -141,8 +152,8 @@ public class SpokeSchemaMigrator implements SpokeProvisioner {
   }
 
   private void migrate(String url) throws Exception {
-    String user = properties.username();
-    String password = properties.password();
+    String user = properties.schemaOwnerUsername();
+    String password = properties.schemaOwnerPassword();
     awaitChangelogUnlocked(url, user, password);
     // The lock spans every use of the Liquibase API -- DatabaseFactory and the configuration reads
     // behind it touch the same scope stack as update() does, so locking update() alone still races.
@@ -151,12 +162,14 @@ public class SpokeSchemaMigrator implements SpokeProvisioner {
           "another firm's migration held this JVM's Liquibase lock for longer than " + lockTimeout);
     }
     try (Connection c = connect(url, user, password)) {
+      prepareRuntimeLogin(c);
       Database db =
           DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(c));
       db.setDefaultSchemaName(properties.schema());
       db.setLiquibaseSchemaName(properties.schema());
       try (Liquibase liquibase =
           new Liquibase(properties.changelog(), new ClassLoaderResourceAccessor(), db)) {
+        liquibase.setChangeLogParameter("runtimeLogin", properties.username());
         Scope.child(
             Map.of("liquibase.changelogLockWaitTimeInMinutes", 1),
             () -> liquibase.update(new Contexts(), new LabelExpression()));
@@ -206,6 +219,78 @@ public class SpokeSchemaMigrator implements SpokeProvisioner {
     }
   }
 
+  /**
+   * Two-login mode only: verify the barrier, then grant {@code USAGE} if it is missing. Runs as the
+   * owner under the per-schema advisory lock, so instances racing on one firm never run two GRANTs
+   * on the same catalog row at once ("tuple concurrently updated").
+   */
+  private void prepareRuntimeLogin(Connection c) throws SQLException {
+    if (!properties.hasMigrationLogin()) {
+      return;
+    }
+    c.setAutoCommit(true);
+    lock(c);
+    try {
+      verifyBarrier(c);
+      if (!runtimeHasUsage(c)) {
+        try (Statement s = c.createStatement()) {
+          s.executeUpdate(
+              "GRANT USAGE ON SCHEMA " + quote(properties.schema()) + " TO " + quote(properties.username()));
+        }
+      }
+    } finally {
+      unlock(c);
+    }
+  }
+
+  private void verifyBarrier(Connection c) throws SQLException {
+    try (PreparedStatement ps =
+        c.prepareStatement(
+            "SELECT n.nspowner::regrole::text,"
+                + " pg_has_role(?, n.nspowner, 'MEMBER'),"
+                + " coalesce((SELECT rolsuper FROM pg_roles WHERE rolname = ?), false)"
+                + " FROM pg_namespace n WHERE n.nspname = ?")) {
+      ps.setString(1, properties.username());
+      ps.setString(2, properties.username());
+      ps.setString(3, properties.schema());
+      try (ResultSet rs = ps.executeQuery()) {
+        rs.next();
+        String owner = rs.getString(1);
+        if (!properties.migrationUsername().equals(owner)) {
+          throw barrier("schema is owned by '" + owner + "', not by the migration login");
+        }
+        if (rs.getBoolean(2)) {
+          throw barrier("the runtime login is a member of the owner role and so has its privileges");
+        }
+        if (rs.getBoolean(3)) {
+          throw barrier("the runtime login is a superuser");
+        }
+      }
+    }
+  }
+
+  private IllegalStateException barrier(String reason) {
+    return new IllegalStateException(
+        "refusing to use schema '"
+            + properties.schema()
+            + "' in two-login mode: "
+            + reason
+            + ". Grants are then no limit on the runtime login '"
+            + properties.username()
+            + "' (ADR-0058 amendment 2026-11-13).");
+  }
+
+  private boolean runtimeHasUsage(Connection c) throws SQLException {
+    try (PreparedStatement ps = c.prepareStatement("SELECT has_schema_privilege(?, ?, 'USAGE')")) {
+      ps.setString(1, properties.username());
+      ps.setString(2, properties.schema());
+      try (ResultSet rs = ps.executeQuery()) {
+        rs.next();
+        return rs.getBoolean(1);
+      }
+    }
+  }
+
   private static Connection connect(String url, String user, String password) throws SQLException {
     Properties p = new Properties();
     p.setProperty("user", user);
@@ -215,7 +300,10 @@ public class SpokeSchemaMigrator implements SpokeProvisioner {
     return DriverManager.getConnection(url, p);
   }
 
-  /** Schema and role names are validated upstream; quoting is the second line of defence. */
+  /**
+   * Schema and login names are validated against {@code ^[a-z][a-z0-9_]{0,62}$} in
+   * {@link TenancyProperties#validate()}; quoting is the second line of defence.
+   */
   private static String quote(String identifier) {
     return "\"" + identifier.replace("\"", "\"\"") + "\"";
   }

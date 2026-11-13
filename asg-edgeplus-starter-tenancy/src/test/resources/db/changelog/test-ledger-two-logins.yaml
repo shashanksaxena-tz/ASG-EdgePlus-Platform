@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: ledger-001-row
+      author: platform-test
+      changes:
+        - sql:
+            sql: CREATE TABLE ledger_row (id uuid PRIMARY KEY, amount numeric(19,4) NOT NULL)
+        - sql:
+            sql: GRANT SELECT, INSERT ON ledger_row TO "${runtimeLogin}"

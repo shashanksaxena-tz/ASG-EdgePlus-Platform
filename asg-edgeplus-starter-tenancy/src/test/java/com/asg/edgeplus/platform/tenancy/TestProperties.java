@@ -81,5 +81,13 @@ final class TestProperties {
         v.poolIdleTimeout(), roles);
   }
 
+  static TenancyProperties withMigration(String migrationUsername, String migrationPassword) {
+    TenancyProperties v = valid();
+    return new TenancyProperties(
+        v.enabled(), v.jdbcUrlTemplate(), v.databaseNameTemplate(), v.schema(), v.username(),
+        v.password(), v.changelog(), v.adminUsername(), v.adminPassword(), v.poolMaxSize(),
+        v.poolIdleTimeout(), v.platformScopeRoles(), migrationUsername, migrationPassword);
+  }
+
   private TestProperties() {}
 }

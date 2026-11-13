@@ -214,4 +214,18 @@ class TenancyAutoConfigurationTest {
         .withBean(SpokeLocator.class, () -> tenant -> "asg_spoke_x")
         .run(ctx -> assertThat(ctx).hasFailed());
   }
+
+  @Test
+  void bindsTheMigrationLoginFromKebabCaseProperties() {
+    runner
+        .withPropertyValues(
+            "asg.platform.tenancy.migration-username=svc_mig",
+            "asg.platform.tenancy.migration-password=mig-test-only")
+        .run(
+            ctx -> {
+              TenancyProperties p = ctx.getBean(TenancyProperties.class);
+              assertThat(p.hasMigrationLogin()).isTrue();
+              assertThat(p.schemaOwnerUsername()).isEqualTo("svc_mig");
+            });
+  }
 }
