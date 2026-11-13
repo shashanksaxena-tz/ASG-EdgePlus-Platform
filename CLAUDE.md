@@ -76,8 +76,10 @@ and dropping `<skipTests>` belongs in its own PR against one service.
 ## Releasing
 
 Tag `vX.Y.Z`. `release.yml` runs `versions:set` from the tag and deploys to GitHub Packages.
-Consumers pick it up via Renovate. **Nothing downstream can resolve this parent until the first
-release exists** — `ASG-Edgeplus-Configuration-Service` CI is blocked on it.
+Consumers pick it up via Renovate. Every push to `main` also deploys the current
+`X.Y.Z-SNAPSHOT`, which is what services pinned to the snapshot resolve in CI between releases.
+The deploy target is passed as `-DaltDeploymentRepository`, not declared in a pom, because a
+`<distributionManagement>` in `asg-edgeplus-parent` would be inherited by every service.
 
 When bumping a CVE pin: edit here, cut a release, let Renovate open the PRs. Do not pin a version in
 a service pom. If you find yourself wanting to, the answer is a new parent release — or a documented
