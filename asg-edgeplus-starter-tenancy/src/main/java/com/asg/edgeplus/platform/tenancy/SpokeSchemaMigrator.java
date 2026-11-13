@@ -154,6 +154,11 @@ public class SpokeSchemaMigrator implements SpokeProvisioner {
   private void migrate(String url) throws Exception {
     String user = properties.schemaOwnerUsername();
     String password = properties.schemaOwnerPassword();
+    // Barrier first: a schema the migration login does not own must be refused with that reason,
+    // not with whatever "permission denied" the first query against it happens to hit.
+    try (Connection c = connect(url, user, password)) {
+      prepareRuntimeLogin(c);
+    }
     awaitChangelogUnlocked(url, user, password);
     // The lock spans every use of the Liquibase API -- DatabaseFactory and the configuration reads
     // behind it touch the same scope stack as update() does, so locking update() alone still races.
@@ -162,7 +167,6 @@ public class SpokeSchemaMigrator implements SpokeProvisioner {
           "another firm's migration held this JVM's Liquibase lock for longer than " + lockTimeout);
     }
     try (Connection c = connect(url, user, password)) {
-      prepareRuntimeLogin(c);
       Database db =
           DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(c));
       db.setDefaultSchemaName(properties.schema());

@@ -67,6 +67,14 @@ migration login; requests run as `username` with only the granted privileges, so
     sql: GRANT SELECT, INSERT ON ledger_row TO "${runtimeLogin}"
 ```
 
+Before every migration the starter **verifies** the barrier and refuses the firm (503 to the
+caller) unless the migration login owns the schema and the runtime login is neither a superuser nor
+a member of the owner role. Login names must match `^[a-z][a-z0-9_]{0,62}$`.
+
+**The runtime login name is fixed per environment.** Liquibase computes a changeset's checksum after
+substituting `${runtimeLogin}`, so renaming the login (e.g. alternating-user secret rotation) would
+fail checksum validation on every firm. Rotate the password, not the name.
+
 ## Not here
 
 Creating the spoke **database**, the firm registry, provisioning jobs, seeding and the
