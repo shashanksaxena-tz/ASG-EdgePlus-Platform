@@ -27,8 +27,9 @@ jobs:
           distribution: corretto
           cache: maven
       - name: Verify
-        # -Ddocker.available=false: nothing here needs a container.
-        run: ./mvnw -B -ntp verify -Ddocker.available=false
+        # -Ddocker.available=true is required: =false activates the no-docker profile, which skips
+        # every test (not only container tests), and starter-tenancy's tests use Testcontainers.
+        run: ./mvnw -B -ntp verify -Ddocker.available=true
 
   # Forward compatibility. Same sources, same bytecode target (21), built and tested on
   # Corretto 24 so that a JDK bump is a decision rather than a discovery. The jdk24-runtime
@@ -55,7 +56,7 @@ jobs:
           distribution: corretto
           cache: maven
       - name: Verify on JDK ${{ matrix.java }} (target stays 21)
-        run: ./mvnw -B -ntp verify -Ddocker.available=false
+        run: ./mvnw -B -ntp verify -Ddocker.available=true
       - name: Verify targeting JDK ${{ matrix.java }} (-Pjava24)
         # Second pass: what would break if a service actually moved its target forward.
-        run: ./mvnw -B -ntp verify -Ddocker.available=false -Pjava24
+        run: ./mvnw -B -ntp verify -Ddocker.available=true -Pjava24
