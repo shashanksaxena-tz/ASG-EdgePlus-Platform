@@ -54,6 +54,8 @@
     -->
     <java.version>21</java.version>
     <java.next.version>24</java.next.version>
+    <!-- Exclusive upper bound for the enforcer: every patch release of java.next.version passes. -->
+    <java.ceiling.version>25</java.ceiling.version>
     <jdk.distribution>corretto</jdk.distribution>
 
     <!-- Derived, so a baseline move is a one-line edit above. -->
@@ -346,7 +348,7 @@
               <configuration>
                 <rules>
                   <requireJavaVersion>
-                    <version>[${java.version},${java.next.version}.0.1)</version>
+                    <version>[${java.version},${java.ceiling.version})</version>
                     <message>
                       ASG Edge+ builds on Amazon Corretto ${java.version} (baseline) or
                       ${java.next.version} (forward-compat). Install one of those and point
