@@ -51,7 +51,7 @@ Two numbers, deliberately separate, both in `asg-edgeplus-parent/pom.xml`:
 
 `maven.compiler.release` is set (not just source/target), so the target is independent of the JDK
 running Maven. Amazon Corretto everywhere: it is what the AWS base images ship. An enforcer rule
-fails at `validate` on any JDK outside `[21, 24.0.1)`.
+fails at `validate` on any JDK outside `[21, 25)` (`java.ceiling.version`), so every 24.x patch passes.
 
 `./mvnw -Pjava24` targets 24 for one build. `./mvnw -Ptoolchain` builds through registered Corretto
 toolchains (`toolchains.xml.sample`). The `jdk24-runtime` profile auto-activates on JDK 24+ and adds
